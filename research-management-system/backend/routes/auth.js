@@ -5,12 +5,30 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
+const ALLOWED_ROLES = ['admin', 'research_lead', 'team_member'];
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, department } = req.body;
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ success: false, message: 'Request body must be JSON' });
+    }
+
+    let { name, email, password, role, department } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ success: false, message: 'name, email, password, role are required' });
+    }
+
+    // Validate role
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role selected' });
+    }
+
+    email = String(email).toLowerCase().trim();
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -21,33 +39,31 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user (password hashing is done in User model pre-save)
     const user = await User.create({
-      name,
+      name: String(name).trim(),
       email,
       password,
       role,
-      department
+      department: department || ''
     });
 
-    if (user) {
-      res.status(201).json({
-        success: true,
-        data: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          department: user.department,
-          token: generateToken(user._id)
-        }
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        token: generateToken(user._id)
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || 'Registration failed'
     });
   }
 });
@@ -57,17 +73,21 @@ router.post('/register', async (req, res) => {
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+
+    email = String(email).toLowerCase().trim();
 
     // Check for user
     const user = await User.findOne({ email }).select('+password');
-
     if (user && (await user.matchPassword(password))) {
-      // Update last login
+      // Optional: record last login (ignore if fails)
       user.lastLogin = new Date();
-      await user.save();
+      try { await user.save(); } catch (_) {}
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           _id: user._id,
@@ -79,16 +99,16 @@ router.post('/login', async (req, res) => {
         }
       });
     } else {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
   } catch (error) {
     console.error('Login error:', error);
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message || 'Login failed'
     });
   }
 });
@@ -98,15 +118,11 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.get('/me', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    
-    res.json({
-      success: true,
-      data: user
-    });
+    const user = await User.findById(req.user._id).select('-password');
+    return res.json({ success: true, data: user });
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message
     });

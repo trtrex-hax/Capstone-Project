@@ -1,27 +1,41 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import AdminDashboard from '../components/dashboards/AdminDashboard';
 import ResearchLeadDashboard from '../components/dashboards/ResearchLeadDashboard';
 import TeamMemberDashboard from '../components/dashboards/TeamMemberDashboard';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const userRole = localStorage.getItem('userRole') || 'team_member';
-  const userName = "Demo User";
+  const { user, loading, isAuthenticated, logout } = useAuth();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Auth guard
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
 
   const roleLabels = {
     admin: 'Administrator',
-    research_lead: 'Research Lead', 
+    research_lead: 'Research Lead',
     team_member: 'Team Member'
-  };
+  } as const;
 
   const handleLogout = () => {
-    localStorage.removeItem('userRole');
+    logout();             // uses your AuthContext to clear token + user
     navigate('/login');
   };
 
   const renderDashboard = () => {
-    switch (userRole) {
+    switch (user.role) {
       case 'admin':
         return <AdminDashboard />;
       case 'research_lead':
@@ -56,16 +70,17 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-700">Welcome, {userName}</span>
+              <span className="text-gray-700">Welcome, {user.name}</span>
               <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                {roleLabels[userRole as keyof typeof roleLabels]}
+                {roleLabels[user.role] ?? 'User'}
               </span>
               <button onClick={handleLogout} className="text-blue-600 hover:text-blue-800 font-medium">
                 Logout
               </button>
             </div>
           </div>
-          
+
+          {/* Mobile Navigation */}
           <div className="md:hidden border-t pt-4 pb-2">
             <div className="flex space-x-4 overflow-x-auto">
               <button onClick={() => navigate('/dashboard')} className="text-gray-700 hover:text-blue-600 font-medium whitespace-nowrap">

@@ -1,26 +1,49 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 type UserRole = 'admin' | 'research_lead' | 'team_member';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('team_member');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  // Store the selected role for dashboard access
-  localStorage.setItem('userRole', selectedRole);
-  
-  // Navigate to dashboard
-  navigate('/dashboard');
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    // Call your AuthContext login
+    const result = await login(email, password);
+    setIsLoading(false);
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.message || 'Login failed');
+    }
+  };
 
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
+    // Auto-fill demo credentials based on role selection (email only)
+    switch (role) {
+      case 'admin':
+        setEmail('admin@university.edu');
+        break;
+      case 'research_lead':
+        setEmail('lead@university.edu');
+        break;
+      case 'team_member':
+        setEmail('member@university.edu');
+        break;
+    }
   };
 
   const roleConfig = {
@@ -43,6 +66,12 @@ const Login: React.FC = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+            
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -56,7 +85,7 @@ const Login: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your email"
+                  placeholder="you@university.edu"
                 />
               </div>
             </div>
@@ -79,10 +108,10 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            {/* Role Selection Section - Horizontal Layout */}
+            {/* Role Selection Section */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Select Your Role
+                Select Demo User Role
               </label>
               <div className="flex gap-2">
                 {(['admin', 'research_lead', 'team_member'] as UserRole[]).map((role) => (
@@ -112,15 +141,24 @@ const Login: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isLoading}
+                className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
-                Sign in as {roleConfig[selectedRole].label}
+                {isLoading ? 'Signing in...' : 'Sign in'}
               </button>
+            </div>
+
+            {/* Link to Register */}
+            <div className="text-center text-sm text-gray-600">
+              Don’t have an account?{' '}
+              <Link to="/register" className="text-blue-600 hover:text-blue-800 font-medium">
+                Create one
+              </Link>
             </div>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Demo: Select your role and click "Sign in" to continue</p>
+            <p>Demo: Select a role and use password: <strong>password123</strong></p>
             <p className="mt-1 text-xs">Current selection: <span className="font-medium">{roleConfig[selectedRole].label}</span></p>
           </div>
         </div>
